@@ -6,7 +6,6 @@ import 'package:cringe/hz/services/collections/word_collection.dart';
 
 extension SwappableList<E> on List<E> {
   (E, int) rnd() {
-    print("Random $this");
     final index = Random().nextInt(length);
     return (this[index], index);
   }
