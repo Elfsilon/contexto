@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cringe/hz/models/task.dart';
+import 'package:cringe/hz/services/collections/kana_collection.dart';
 import 'package:cringe/hz/services/collections/models.dart';
 import 'package:cringe/hz/services/collections/word_collection.dart';
 
@@ -12,146 +13,106 @@ extension SwappableList<E> on List<E> {
 }
 
 class CollectionsManager {
-  final wordCollection = createWordCollection();
   final Task? prevTask = null;
+  final collections = {
+    0: createWordCollection(),
+    1: createKanaCollection(),
+  };
 
   Task getTask(int collectionID) {
+    if (!collections.containsKey(collectionID)) throw Exception();
+    final collection = collections[collectionID]!;
+    final (taskType, _) = TaskType.values.rnd();
+
     Task task;
     do {
-      final (taskType, _) = TaskType.values.rnd();
-      task = switch (collectionID) {
-        // 1 => wordCollection,
-        // 2 => wordCollection,
-        _ => fromWords(taskType),
-      };
+      task = generateTask(taskType, collectionID, collection);
     } while (task == prevTask);
 
     return task;
   }
 
-  Task fromWords(TaskType type) {
-    final variants = <Task>[];
+  Task generateTask(TaskType type, int collectionID, List<CollectionItem> collection) {
+    final taskVariants = <Task>[];
+    final (targetItem, targetItemIndex) = collection.rnd();
+    final targetField = targetItem.target;
+    final (otherField, otherFieldIndex) = targetItem.fields.rnd();
 
     if (type == TaskType.def || type == TaskType.connect) {
-      final (word, index) = wordCollection.rnd();
+      final targetOtherSet = [targetField, otherField];
+      final otherTargetSet = [otherField, targetField];
 
-      variants.add(Task(
-        collectionID: 0,
-        itemID: index,
-        type: type,
-        title: "Write down reading of the word",
-        targets: [word.target.value],
-        variants: [word.reading.value],
-        answers: {0: 0},
-      ));
+      final trainingsSets = switch (otherField.mode) {
+        TrainingMode.target => [targetOtherSet],
+        TrainingMode.field => [otherTargetSet],
+        TrainingMode.both => [targetOtherSet, otherTargetSet],
+        _ => throw Exception("'Gen default task' - unexpected training mode: ${otherField.mode}"),
+      };
 
-      variants.add(Task(
-        collectionID: 0,
-        itemID: index,
-        type: type,
-        title: "Write down word by given meaning",
-        targets: [word.meanings.value.join(", ")],
-        variants: [word.target.value],
-        answers: {0: 0},
-      ));
-
-      if (word.partOfSpeech.value == PartOfSpeech.verb) {
-        if (word.dictionaryForm.value != null) {
-          variants.add(Task(
-            collectionID: 0,
-            itemID: index,
-            type: type,
-            title: "Write down dictionary form of given verb",
-            targets: [word.target.value],
-            variants: [word.dictionaryForm.value!],
-            answers: {0: 0},
-          ));
-        }
-
-        if (word.presentAffirmativeForm.value != null) {
-          variants.add(Task(
-            collectionID: 0,
-            itemID: index,
-            type: type,
-            title: "Write down present affirmative form of given verb",
-            targets: [word.target.value],
-            variants: [word.presentAffirmativeForm.value!],
-            answers: {0: 0},
-          ));
-        }
-
-        if (word.presentNegativeForm.value != null) {
-          variants.add(Task(
-            collectionID: 0,
-            itemID: index,
-            type: type,
-            title: "Write down present negative form of given verb",
-            targets: [word.target.value],
-            variants: [word.presentNegativeForm.value!],
-            answers: {0: 0},
-          ));
+      for (final trainingSet in trainingsSets) {
+        final task = Task(
+          collectionID: collectionID,
+          itemID: targetItemIndex,
+          type: type,
+          title: trainingSet[0].name,
+          targets: [trainingSet[0].value],
+          variants: [trainingSet[1].value],
+          answers: {0: 0},
+        );
+        taskVariants.add(task);
+      }
+    } else if (type == TaskType.pickOne) {
+      // Select all elements with existing non-nullable picked field
+      var additionalItems = <CollectionItem>[];
+      for (int i = 0; i < collection.length; i++) {
+        final item = collection[i];
+        if (i != targetItemIndex && item.fields.length > otherFieldIndex) {
+          additionalItems.add(item);
         }
       }
-    }
 
-    if (type == TaskType.pickOne) {
-      final (word, index) = wordCollection.rnd();
-      final wrong = <Word>[];
-      final wrongIndexes = <int>[];
-      for (int i = 0; i < 3; i++) {
-        Word curr;
-        int currIndex;
-
-        do {
-          (curr, currIndex) = wordCollection.rnd();
-        } while (currIndex == index || wrongIndexes.contains(currIndex));
-
-        wrong.add(curr);
-        wrongIndexes.add(currIndex);
+      additionalItems.shuffle();
+      if (additionalItems.length > 4) {
+        additionalItems = additionalItems.take(4).toList();
       }
 
-      // Meanings
-      final targetMeanings = word.meanings.value.join(", ");
-      List<String> meaningOptions = [targetMeanings, ...wrong.map((e) => e.meanings.value.join(", "))];
-      meaningOptions.shuffle(Random());
-      variants.add(Task(
-        collectionID: 0,
-        itemID: index,
-        type: type,
-        title: "Pick the right meaning",
-        targets: [word.target.value],
-        variants: meaningOptions,
-        answers: {0: meaningOptions.indexOf(targetMeanings)},
-      ));
+      final SelectableField target;
+      final List<String> options;
+      final Function(List<String> values) getRightAnswerIndex;
 
-      // Targets
-      final targetOptions = [word.target.value, ...wrong.map((e) => e.target.value)];
-      targetOptions.shuffle(Random());
-      variants.add(Task(
-        collectionID: 0,
-        itemID: index,
-        type: type,
-        title: "Pick the right word",
-        targets: [targetMeanings],
-        variants: targetOptions,
-        answers: {0: targetOptions.indexOf(word.target.value)},
-      ));
+      if (otherField.mode == TrainingMode.target || otherField.mode == TrainingMode.both) {
+        target = targetField;
+        options = <String>[
+          otherField.value,
+          ...additionalItems.map((i) => i.fields[otherFieldIndex].value),
+        ];
+        getRightAnswerIndex = (values) => values.indexOf(otherField.value);
+      } else if (otherField.mode == TrainingMode.field) {
+        target = otherField;
+        options = <String>[
+          targetField.value,
+          ...additionalItems.map((i) => i.target.value),
+        ];
+        getRightAnswerIndex = (values) => values.indexOf(targetField.value);
+      } else {
+        throw Exception("'Gen pick one task' - unexpected training mode: ${otherField.mode}");
+      }
 
-      // Targets
-      final readingOptions = [word.reading.value, ...wrong.map((e) => e.reading.value)];
-      readingOptions.shuffle(Random());
-      variants.add(Task(
-        collectionID: 0,
-        itemID: index,
+      options.shuffle();
+
+      final task = Task(
+        collectionID: collectionID,
+        itemID: targetItemIndex,
         type: type,
-        title: "Pick the right reading",
-        targets: [word.target.value],
-        variants: readingOptions,
-        answers: {0: readingOptions.indexOf(word.reading.value)},
-      ));
+        title: target.name,
+        targets: [target.value],
+        variants: options,
+        answers: {0: getRightAnswerIndex(options)},
+      );
+      taskVariants.add(task);
     }
 
-    return variants.rnd().$1;
+    return taskVariants.rnd().$1;
   }
 }
 

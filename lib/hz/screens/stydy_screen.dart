@@ -12,6 +12,8 @@ class StudyScreen extends StatefulWidget {
 }
 
 class _StudyScreenState extends State<StudyScreen> {
+  int selectedCollectionId = 1;
+
   @override
   void initState() {
     super.initState();
@@ -20,7 +22,7 @@ class _StudyScreenState extends State<StudyScreen> {
 
   void pickTask() {
     final cubit = context.read<StudyCubit>();
-    cubit.pickTask(0);
+    cubit.pickTask(selectedCollectionId);
   }
 
   @override
@@ -29,6 +31,17 @@ class _StudyScreenState extends State<StudyScreen> {
       backgroundColor: context.theme.color.neutral.n6,
       body: BlocBuilder<StudyCubit, Task>(
         builder: (context, state) {
+          if (state == Task.empty()) {
+            return Center(
+              child: SizedBox.square(
+                dimension: 32,
+                child: CircularProgressIndicator(
+                  color: context.theme.color.accent.blue.primary,
+                ),
+              ),
+            );
+          }
+
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -45,25 +58,12 @@ class _StudyScreenState extends State<StudyScreen> {
                 const SizedBox(height: 32),
                 StudyOptions(
                   values: state.variants,
-                  onSelect: (index) {
-                    pickTask();
-                  },
+                  onSelect: (index) => pickTask(),
                 ),
               ],
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: pickTask,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          decoration: const BoxDecoration(
-            color: Colors.amber,
-            borderRadius: BorderRadius.all(Radius.circular(15)),
-          ),
-          child: const Text("Next"),
-        ),
       ),
     );
   }
@@ -84,12 +84,15 @@ class StudyOptions extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 200),
       child: Column(
-        children: List.generate(2 * values.length - 1, (i) {
-          if (i % 2 != 0) return const SizedBox(height: 8);
+        mainAxisSize: MainAxisSize.min,
+        children: values.isEmpty
+            ? []
+            : List.generate(2 * values.length - 1, (i) {
+                if (i % 2 != 0) return const SizedBox(height: 8);
 
-          final index = i ~/ 2;
-          return StudyOption(index: index, value: values[index], onSelect: onSelect);
-        }),
+                final index = i ~/ 2;
+                return StudyOption(index: index, value: values[index], onSelect: onSelect);
+              }),
       ),
     );
   }
