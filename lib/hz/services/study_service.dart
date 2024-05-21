@@ -22,6 +22,6 @@ class StudyService {
   /// [time] time in miliseconds spent on the task
   /// [status] if [skipped], then counts as failed, but with a really little cost
   Future<void> sendResult(int collectionID, int itemID, int time, StudyStatus status) async {
-    print("$status to collection=$collectionID, item=$itemID (${time}ms)");
+    // print("$status to collection=$collectionID, item=$itemID (${time}ms)");
   }
 }

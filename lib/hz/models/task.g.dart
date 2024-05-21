@@ -6,7 +6,7 @@ part of 'task.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-Task _$TaskFromJson(Map<String, dynamic> json) => Task(
+_$TaskImpl _$$TaskImplFromJson(Map<String, dynamic> json) => _$TaskImpl(
       collectionID: (json['collectionID'] as num).toInt(),
       itemID: (json['itemID'] as num).toInt(),
       type: $enumDecode(_$TaskTypeEnumMap, json['type']),
@@ -20,7 +20,8 @@ Task _$TaskFromJson(Map<String, dynamic> json) => Task(
       ),
     );
 
-Map<String, dynamic> _$TaskToJson(Task instance) => <String, dynamic>{
+Map<String, dynamic> _$$TaskImplToJson(_$TaskImpl instance) =>
+    <String, dynamic>{
       'collectionID': instance.collectionID,
       'itemID': instance.itemID,
       'type': _$TaskTypeEnumMap[instance.type]!,

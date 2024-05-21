@@ -1,6 +1,8 @@
 import 'dart:math';
 
 import 'package:cringe/hz/models/task.dart';
+import 'package:cringe/hz/services/collections/context_collection.dart';
+import 'package:cringe/hz/services/collections/english_context_conllection.dart';
 import 'package:cringe/hz/services/collections/kana_collection.dart';
 import 'package:cringe/hz/services/collections/models.dart';
 import 'package:cringe/hz/services/collections/word_collection.dart';
@@ -17,28 +19,31 @@ class CollectionsManager {
   final collections = {
     0: createWordCollection(),
     1: createKanaCollection(),
+    2: createContextCollection(),
+    3: createEnglishContextCollection(),
   };
 
   Task getTask(int collectionID) {
-    if (!collections.containsKey(collectionID)) throw Exception();
+    if (!collections.containsKey(collectionID)) throw Exception('collection does not exist');
     final collection = collections[collectionID]!;
-    final (taskType, _) = TaskType.values.rnd();
 
     Task task;
     do {
-      task = generateTask(taskType, collectionID, collection);
+      task = generateTask(collectionID, collection);
     } while (task == prevTask);
 
     return task;
   }
 
-  Task generateTask(TaskType type, int collectionID, List<CollectionItem> collection) {
-    final taskVariants = <Task>[];
+  Task generateTask(int collectionID, List<CollectionItem> collection) {
     final (targetItem, targetItemIndex) = collection.rnd();
-    final targetField = targetItem.target;
     final (otherField, otherFieldIndex) = targetItem.fields.rnd();
+    final targetField = targetItem.target;
 
-    if (type == TaskType.def || type == TaskType.connect) {
+    final (type, _) = otherField.types.isNotEmpty ? otherField.types.rnd() : TaskType.values.rnd();
+    final taskVariants = <Task>[];
+
+    if (type == TaskType.def) {
       final targetOtherSet = [targetField, otherField];
       final otherTargetSet = [otherField, targetField];
 
@@ -53,28 +58,27 @@ class CollectionsManager {
         final task = Task(
           collectionID: collectionID,
           itemID: targetItemIndex,
-          type: type,
-          title: trainingSet[0].name,
+          type: TaskType.def, //type,
+          title: "Type ${trainingSet[1].name.toLowerCase()} by the given ${trainingSet[0].name.toLowerCase()}",
           targets: [trainingSet[0].value],
           variants: [trainingSet[1].value],
           answers: {0: 0},
         );
         taskVariants.add(task);
       }
-    } else if (type == TaskType.pickOne) {
-      // Select all elements with existing non-nullable picked field
-      var additionalItems = <CollectionItem>[];
+    } else if (type == TaskType.pickOne || type == TaskType.connect) {
+      // Select all unique elements with existing non-nullable picked field
+      var extraItems = <CollectionItem>{};
       for (int i = 0; i < collection.length; i++) {
         final item = collection[i];
-        if (i != targetItemIndex && item.fields.length > otherFieldIndex) {
-          additionalItems.add(item);
-        }
-      }
+        final hasField = i != targetItemIndex && item.fields.length > otherFieldIndex;
+        final hasFieldAndUnique = hasField &&
+            otherField != item.fields[otherFieldIndex] &&
+            extraItems.every((i) => i.fields[otherFieldIndex] != item.fields[otherFieldIndex]);
 
-      additionalItems.shuffle();
-      if (additionalItems.length > 4) {
-        additionalItems = additionalItems.take(4).toList();
+        if (hasFieldAndUnique) extraItems.add(item);
       }
+      extraItems = extraItems.take(4).toSet();
 
       final SelectableField target;
       final List<String> options;
@@ -84,14 +88,14 @@ class CollectionsManager {
         target = targetField;
         options = <String>[
           otherField.value,
-          ...additionalItems.map((i) => i.fields[otherFieldIndex].value),
+          ...extraItems.map((i) => i.fields[otherFieldIndex].value),
         ];
         getRightAnswerIndex = (values) => values.indexOf(otherField.value);
       } else if (otherField.mode == TrainingMode.field) {
         target = otherField;
         options = <String>[
           targetField.value,
-          ...additionalItems.map((i) => i.target.value),
+          ...extraItems.map((i) => i.target.value),
         ];
         getRightAnswerIndex = (values) => values.indexOf(targetField.value);
       } else {
@@ -104,7 +108,7 @@ class CollectionsManager {
         collectionID: collectionID,
         itemID: targetItemIndex,
         type: type,
-        title: target.name,
+        title: "Pick the right option for given ${target.name.toLowerCase()}",
         targets: [target.value],
         variants: options,
         answers: {0: getRightAnswerIndex(options)},
@@ -115,7 +119,3 @@ class CollectionsManager {
     return taskVariants.rnd().$1;
   }
 }
-
-class ContextCollection {}
-
-class KanaCollection {}

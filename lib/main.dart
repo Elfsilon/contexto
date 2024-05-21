@@ -1,7 +1,7 @@
 import 'package:cringe/core/theme/app_theme_provider.dart';
 import 'package:cringe/core/theme/light_theme.dart';
 import 'package:cringe/hz/controllers/study_cubit.dart';
-import 'package:cringe/hz/screens/stydy_screen.dart';
+import 'package:cringe/hz/screens/study_screen.dart';
 import 'package:cringe/hz/services/study_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

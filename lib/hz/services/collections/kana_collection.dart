@@ -1,5 +1,26 @@
 import 'package:cringe/hz/services/collections/models.dart';
 
+class Kana implements CollectionModel {
+  Kana({
+    required String target,
+    required String reading,
+  })  : target = Field(name: 'Character', value: target),
+        reading = Field(name: 'Reading', value: reading);
+
+  Field<String> target;
+  Field<String> reading;
+
+  @override
+  CollectionItem toCollectionItem() {
+    return CollectionItem(
+      target: SelectableField(mode: TrainingMode.both, name: target.name, value: target.value),
+      fields: [
+        SelectableField(mode: TrainingMode.target, name: reading.name, value: reading.value),
+      ],
+    );
+  }
+}
+
 List<CollectionItem> createKanaCollection() {
   return [
     ..._createHiragana(),
